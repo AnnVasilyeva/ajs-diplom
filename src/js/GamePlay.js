@@ -149,6 +149,7 @@ export default class GamePlay {
     event.preventDefault();
     const index = this.cells.indexOf(event.currentTarget);
     this.cellEnterListeners.forEach((o) => o.call(null, index));
+    // тоже самое: this.cellEnterListeners.forEach((o) => o(index));
   }
 
   onCellLeave(event) {

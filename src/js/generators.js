@@ -21,10 +21,11 @@ export function* characterGenerator(allowedTypes, maxLevel) {
 export function generateTeam(allowedTypes, maxLevel, characterCount) {
   // TODO: write logic here
   // character = [{value: new Bowman(1), done: false}, {...}] - пример
-  const character = characterGenerator(allowedTypes, maxLevel);
+
   const team = [];
 
   for (let i = 0; i < characterCount; i++) {
+    const character = characterGenerator(allowedTypes, maxLevel);
     team.push(character.next().value);
   }
   return team;

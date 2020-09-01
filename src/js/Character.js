@@ -24,8 +24,7 @@ export default class Character {
     }
 
   getAttack (attackBefore, life) {
-    let attackAfter = Math.max(attackBefore, attackBefore * (180 - life) / 100);
-    return attackAfter;
+    return Math.max(attackBefore, attackBefore * (180 - life) / 100);
   }
 
 }

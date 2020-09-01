@@ -31,7 +31,7 @@ export default class GameController {
     // TODO: add event listeners to gamePlay events
     // TODO: load saved stated from stateService
     this.gamePlay.drawUi(this.themes);
-    // this.nextLevel();
+    this.nextLevel();
     this.gamePlay.addNewGameListener(this.newGame.bind(this));
     this.gamePlay.addSaveGameListener(this.saveGame.bind(this));
     this.gamePlay.addLoadGameListener(this.loadGame.bind(this));
@@ -44,10 +44,10 @@ export default class GameController {
     // TODO: react to click
     this.index = index;
 
-    // если поле не активно
+    // если поле активно
     if (!this.blockedBoard) {
       if (this.gamePlay.boardEl.style.cursor === 'not-allowed') {
-        GamePlay.showError('Invalid action');
+        GamePlay.showError('Не входит в допустимый радиус');
       } else if (this.getIndex([...this.userPositions]) !== -1) {
         // если персонаж соответсвует списку пользовательских
         // снимаем выделение с ранее отмеченного персонажа
@@ -62,7 +62,7 @@ export default class GameController {
         this.selected = true;
       } else if (!this.selected && this.getIndex([...this.enemyPositions]) !== -1) {
         // если персонаж не выбран и он есть в списке врагов
-        GamePlay.showError('Error');
+        GamePlay.showError('нельзя играть за врага');
       } else if (this.selected && this.gamePlay.boardEl.style.cursor === 'pointer') {
         // если персонаж выбран и курсор на клетке pointer
         this.selectedCharacter.position = index;
@@ -76,6 +76,7 @@ export default class GameController {
         this.enemyStrategy();
 
       } else if (this.selected && this.gamePlay.boardEl.style.cursor === 'crosshair') {
+        // если персонаж выбран и курсор на клетке crosshair
         const thisAttackEnemy = [...this.enemyPositions].find((item) => item.position === index);
         this.gamePlay.deselectCell(this.selectedCharacterIndex);
         this.gamePlay.deselectCell(index);
@@ -84,7 +85,10 @@ export default class GameController {
 
         await this.characterAttacking(this.selectedCharacter.character, thisAttackEnemy);
         if (this.enemyPositions.length > 0) {
-          this.enemyStrategy();
+
+          console.log(thisAttackEnemy);
+
+          this.getEnemyAttack(this.selectedCharacter, thisAttackEnemy);
         }
       }
     }
@@ -102,7 +106,12 @@ export default class GameController {
 
      const targetedCharacter = target.character;
      // уменьшаем здоровье на полученный урон
-     targetedCharacter.health -= damage;
+    if (targetedCharacter.health - damage > 0) {
+      targetedCharacter.health -= damage;
+    } else {
+      targetedCharacter.health = 0;
+    }
+
      // меняем  игрока
      this.currentMove = this.currentMove === 'enemy' ? 'user' : 'enemy';
 
@@ -113,7 +122,7 @@ export default class GameController {
      }
      // проверяем сколько игроков осталось после атаки
      if (this.userPositions.length === 0) {
-       this.gamePlay.showMessage('Game over!');
+       GamePlay.showMessage('Game over!');
        this.blockedBoard = true;
      }
      // если врагов не осталось- считаем очки, повышаем уровень
@@ -151,28 +160,26 @@ export default class GameController {
     }
 
     if (this.selected) {
+        const allowedPosition = this.selectedCharacter.position;
+        const allowedDistance = this.selectedCharacter.character.distance;
+        const allowedDistanceAttack = this.selectedCharacter.character.distanceAttack;
 
-      const allowedPosition = this.selectedCharacter.position;
-      const allowedDistance = this.selectedCharacter.character.distance;
-      const allowedDistanceAttack = this.selectedCharacter.character.distanceAttack;
+        const allowedAttack = this.allowedPositions(allowedPosition, allowedDistanceAttack);
+        const allowedPositions = this.allowedPositions(allowedPosition, allowedDistance, true);
 
-      const allowedAttack = this.allowedPositions(allowedPosition, allowedDistanceAttack);
-      const allowedPositions = this.allowedPositions(allowedPosition, allowedDistance);
-
-
-      if (this.getIndex(this.userPositions) !== -1) {
-        this.gamePlay.setCursor(cursors.pointer);
-      } else if (this.getIndex(this.enemyPositions) !== -1 && allowedAttack.includes(index)) {
-        // нужно проверять радиус атаки и что персонаж не враг
-        this.gamePlay.selectCell(index, 'red');
-        this.gamePlay.setCursor(cursors.crosshair);
-      } else if (this.getIndex([...this.userPositions, this.enemyPositions]) === -1 && allowedPositions.includes(index)) {
-        // нужно проверять входит ли в радиус дистанции и никого нет на клетке
-        this.gamePlay.selectCell(index, 'green');
-        this.gamePlay.setCursor(cursors.pointer);
-      } else {
-        this.gamePlay.setCursor(cursors.notallowed);
-      }
+        if (this.getIndex(this.userPositions) !== -1) {
+          this.gamePlay.setCursor(cursors.pointer);
+        } else if (this.getIndex(this.enemyPositions) !== -1 && allowedAttack.includes(index)) {
+          // нужно проверять радиус атаки и что персонаж не враг
+          this.gamePlay.selectCell(index, 'red');
+          this.gamePlay.setCursor(cursors.crosshair);
+        } else if (this.getIndex([...this.userPositions, this.enemyPositions]) === -1 && allowedPositions.includes(index)) {
+          // нужно проверять входит ли в радиус дистанции и никого нет на клетке
+          this.gamePlay.selectCell(index, 'green');
+          this.gamePlay.setCursor(cursors.pointer);
+        } else {
+          this.gamePlay.setCursor(cursors.notallowed);
+        }
     }
   }
 
@@ -264,7 +271,7 @@ export default class GameController {
       this.addPositionedCharacter(this.userTeam, this.enemyTeam);
     } else {
       this.blockedBoard = true;
-      this.gamePlay.showMessage(''); //надо выводить количество очков
+     GamePlay.showMessage(`У вас ${this.points} очков`); //надо выводить количество очков
       return;
     }
 
@@ -341,7 +348,8 @@ export default class GameController {
   }
 
   // вернет массив с допустимыми вариантами передвижения или атаки
-  allowedPositions(position, distance) {
+  allowedPositions(position, distance, isEnemy = false) {
+
     const allowedPositionsArray = [];
     // номер строки на поле от 0 до 7
     const itemRow = Math.floor(position / this.boardSize);
@@ -374,24 +382,46 @@ export default class GameController {
         allowedPositionsArray.push(((itemRow - i) * 8) + (itemColumn + i));
       }
     }
+
+    if (isEnemy === true) {
+      // если ходит враг
+      // позиция не должна совпадать с позицией персонажа
+      let selectedPositions = [];
+
+      for (let i = 0; i < this.userPositions.length; i++) {
+        selectedPositions.push(this.userPositions[i].position);
+        selectedPositions.push(this.enemyPositions[i].position);
+      }
+
+      return allowedPositionsArray.filter(i => selectedPositions.indexOf(i) === -1);
+    }
+
     return allowedPositionsArray;
   }
 
   // действия врага
 
   enemyStrategy() {
+
     if (this.currentMove === 'enemy') {
       // выбираем рандомно врага из списка
-      const randomEnemy = this.getRandom([...this.enemyPositions]);
+      let randomEnemy;
+
+      if (this.enemyPositions.length > 1) {
+        randomEnemy = this.getRandom([...this.enemyPositions]);
+      } else {
+        randomEnemy = this.enemyPositions[0];
+      }
 
       // выбираем рандомно новую позицию из списка возможных
-      const allowEnemyPosition = this.getRandom(this.allowedPositions(randomEnemy.position, randomEnemy.character.distance));
+      const allowEnemyPosition = this.getRandom(this.allowedPositions(randomEnemy.position, randomEnemy.character.distance, true));
 
       // создаем массив с возможными позициями для атаки
-      const allowedEnemyDistanceAttack = this.allowedPositions(randomEnemy.position, randomEnemy.character.distanceAttack);
+      const allowedEnemyDistanceAttack = this.allowedPositions(randomEnemy.position, randomEnemy.character.distanceAttack, true);
 
       // если персонаж игрока находится в области из возможных позиций атаки
       for (let itemUser of [...this.userPositions]) {
+
         if (allowedEnemyDistanceAttack.includes(itemUser.position)) {
           // мы делаем атаку на персонажа
           this.characterAttacking(randomEnemy.character, itemUser);
@@ -406,9 +436,34 @@ export default class GameController {
     }
   }
 
+ getEnemyAttack(user, enemy) {
+   if (this.currentMove === 'enemy') {
+
+     //после атаки персонажа создаем массив возможных аттак врага на которого напали
+     const allowedEnemyDistanceAttack = this.allowedPositions(enemy.position, enemy.character.distanceAttack);
+    // если позиция персонажа из списка позиций атаки врага, мы атакуем персонаж ответно
+     if(allowedEnemyDistanceAttack.includes(user.position) && enemy.character.health > 0) {
+       this.characterAttacking(enemy.character, user);
+       if (this.userPositions.length === 0) {
+         this.blockedBoard = true;
+         GamePlay.showMessage('Вы проиграли!');
+         return;
+       }
+     } else {
+       // если мы не можем атаковать тот персонаж который атаковал нас
+       // враг переходит на другую рандомную позицию
+
+       const allowEnemyPosition = this.getRandom(this.allowedPositions(enemy.position, enemy.character.distance));
+       enemy.position = allowEnemyPosition;
 
 
+       this.gamePlay.redrawPositions([...this.userPositions, ...this.enemyPositions]);
+       this.currentMove = 'user';
 
+
+     }
+   }
+  }
 
 
 
